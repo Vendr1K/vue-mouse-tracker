@@ -1,4 +1,3 @@
-
 class MouseTracker {
   constructor(element, options = {}) {
     this.element = element;
@@ -13,98 +12,144 @@ class MouseTracker {
     this.isTracking = false; // определяет запущен трекер или нет
     this.isMouseOver = false; // находится ли курсор над элементом
 
-    this.currentPosition = null;  // текущая позиция курсора
+    this.currentMousePosition = null;  // текущая позиция курсора
     this.positionStartTime = null; // время начала нахождения в текущей позиции
 
-
-    // подвязка обработчиков к контексту
+    // подвязка методов к контексту
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleMouseEnter = this.handleMouseEnter.bind(this);
     this.handleMouseLeave = this.handleMouseLeave.bind(this);
     this.saveCurrentPosition = this.saveCurrentPosition.bind(this);
     this.updateCursorPosition = this.updateCursorPosition.bind(this);
+    this.sendData = this.sendData.bind(this);
   }
 
 
-  // Обработчики движения мыши
-  handleMouseEnter() {
+  // Методы для обработчиков движения курсова
+  handleMouseEnter(event) {
     this.isMouseOver = true;
+
+    if (this.isTracking) {
+      const coords = this.getRelativeCoordinates(event);
+      this.updateCursorPosition(coords);
+    }
   }
 
   handleMouseLeave() {
     this.isMouseOver = false;
+
+    if (this.isTracking && this.currentMousePosition) {
+      this.saveCurrentPosition();
+      this.currentMousePosition = null;
+      this.positionStartTime = null;
+    }
   }
 
-
   handleMouseMove(event) {
-
     if (!this.isTracking || !this.isMouseOver) return
 
-    const rect = this.element.getBoundingClientRect();
-    const coords = {
-      x: Math.round(event.clientX - rect.left),
-      y: Math.round(event.clientY - rect.top)
-    };
+    const coords = this.getRelativeCoordinates(event);
 
-    if (!this.currentPosition) {
-      this.currentPosition = coords
+    if (!this.currentMousePosition) {
+      this.currentMousePosition = coords
     }
 
-
-    // this.saveCurrentPosition()
     this.updateCursorPosition(coords);
   }
 
+  // Метод обновления и записи позиции курса
   updateCursorPosition(coords) {
     const now = Date.now();
 
-    // Если позиция изменилась
-    if (!this.currentPosition ||
-      this.currentPosition.x !== coords.x ||
-      this.currentPosition.y !== coords.y) {
+    if (!this.currentMousePosition ||
+      this.currentMousePosition.x !== coords.x ||
+      this.currentMousePosition.y !== coords.y) {
 
-      // Сохраняем время нахождения в предыдущей позиции перед изменением
-      if (this.currentPosition && this.positionStartTime) {
+      if (this.currentMousePosition && this.positionStartTime) {
         const timeSpent = now - this.positionStartTime;
 
-        if (timeSpent > 0) {
-          // Ищем последнюю запись с такими же координатами
+        if (timeSpent >= this.options.checkInterval) {
           const lastEntry = this.data.length > 0 ? this.data[this.data.length - 1] : null;
 
           if (lastEntry &&
-            lastEntry.x === this.currentPosition.x &&
-            lastEntry.y === this.currentPosition.y) {
-            // Отслеживаем время для существующей записи
+            lastEntry.x === this.currentMousePosition.x &&
+            lastEntry.y === this.currentMousePosition.y) {
             lastEntry.time += timeSpent;
           } else {
-            // Создаем новую запись
             this.data.push({
-              x: this.currentPosition.x,
-              y: this.currentPosition.y,
+              x: this.currentMousePosition.x,
+              y: this.currentMousePosition.y,
               time: timeSpent
             });
           }
         }
       }
 
-      // Начинаем отслеживать новую позицию
-      this.currentPosition = coords;
+      this.currentMousePosition = coords;
       this.positionStartTime = now;
     }
   }
 
-  // сохранить позицию в массив данных
-  saveCurrentPosition() {
+  // Метод для вычисления координат курсора
+  getRelativeCoordinates(event) {
+    const rect = this.element.getBoundingClientRect();
 
-    this.data.push({
-      x: this.currentPosition.x,
-      y: this.currentPosition.y,
-      time: 'timeSpent'
-    });
-
+    return {
+      x: Math.round(event.clientX - rect.left),
+      y: Math.round(event.clientY - rect.top)
+    };
   }
 
-  // начать отслеживание
+  // Метод для сохранения координат курсора, нужна для кейса с handleMouseLeave
+  saveCurrentPosition() {
+    if (!this.currentMousePosition || !this.positionStartTime) return;
+
+    const now = Date.now();
+    const timeSpent = now - this.positionStartTime;
+
+    if (timeSpent >= this.options.checkInterval) {
+      this.data.push({
+        x: this.currentMousePosition.x,
+        y: this.currentMousePosition.y,
+        time: timeSpent
+      });
+    }
+  }
+
+  // Метод для отправки данных на сервер
+  async sendData() {
+    if (!this.isTracking) return;
+    if (this.data.length === 0) return;
+
+    const dataToSend = [...this.data];
+    this.data = [];
+
+    try {
+      const response = await fetch(this.options.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          coordinates: dataToSend,
+          timestamp: Date.now(),
+          elementId: this.element.id || null
+        })
+      });
+
+      if (response.ok) {
+        console.log(`Отправлено ${dataToSend.length} точек координат`);
+      } else {
+        console.warn(`Сервер вернул ошибку ${response.status}: ${response.statusText}`);
+        this.data = [...dataToSend, ...this.data];
+      }
+    } catch (error) {
+      console.error('Ошибка при отправке данных:', error);
+      this.data = [...dataToSend, ...this.data];
+    }
+  }
+
+  // Метод для старта отслеживания
   start() {
     if (this.isTracking) return;
 
@@ -114,16 +159,8 @@ class MouseTracker {
     this.element.addEventListener('mouseenter', this.handleMouseEnter);
     this.element.addEventListener('mouseleave', this.handleMouseLeave);
 
-
-    setInterval(() => {
-      console.log(this.data)
-    }, this.options.checkInterval)
-
-    console.log(this.isTracking, 'isTracking')
-    console.log(this.options.checkInterval, this.options.sendInterval, this.options.url, 'MouseTracker settings')
+    setInterval(this.sendData, this.options.sendInterval);
   }
-
-
 }
 
 export { MouseTracker };
