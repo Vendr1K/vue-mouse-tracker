@@ -1,8 +1,4 @@
-import { MouseTracker } from './src/index.js'
-
-const BASE_URL = 'http://localhost:3000/save.php'
-const BASE_CHECK_INTERVAL = 30
-const BASE_SEND_INTERVAL = 3000
+import { MouseTracker } from '../src/index.js'
 
 const trackArea = document.getElementById('trackArea');
 const coordsDisplay = document.getElementById('coordsDisplay');
@@ -15,6 +11,12 @@ if (trackArea && coordsDisplay) {
     coordsDisplay.textContent = `X: ${x}, Y: ${y}`;
   });
 }
+
+//  usage plugin
+
+const BASE_URL = 'http://localhost:3000/save.php'
+const BASE_CHECK_INTERVAL = 30
+const BASE_SEND_INTERVAL = 3000
 
 const tracker = new MouseTracker(trackArea, {
   url: BASE_URL,
