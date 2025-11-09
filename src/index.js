@@ -15,6 +15,8 @@ class MouseTracker {
     this.currentMousePosition = null;  // текущая позиция курсора
     this.positionStartTime = null; // время начала нахождения в текущей позиции
 
+    this.sendIntervalId = null; // id интервала для отправки данных
+
     // подвязка методов к контексту
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleMouseEnter = this.handleMouseEnter.bind(this);
@@ -25,7 +27,7 @@ class MouseTracker {
   }
 
 
-  // Методы для обработчиков движения курсова
+  // Методы для обработчиков движения курсора
   handleMouseEnter(event) {
     this.isMouseOver = true;
 
@@ -159,8 +161,74 @@ class MouseTracker {
     this.element.addEventListener('mouseenter', this.handleMouseEnter);
     this.element.addEventListener('mouseleave', this.handleMouseLeave);
 
-    setInterval(this.sendData, this.options.sendInterval);
+    this.sendIntervalId = setInterval(this.sendData, this.options.sendInterval);
+  }
+
+  // Остановка отслеживания
+  destroy() {
+    if (!this.isTracking) return;
+
+    this.isTracking = false;
+
+    if (this.currentMousePosition && this.positionStartTime) {
+      this.saveCurrentPosition();
+    }
+
+    this.element.removeEventListener('mousemove', this.handleMouseMove);
+    this.element.removeEventListener('mouseenter', this.handleMouseEnter);
+    this.element.removeEventListener('mouseleave', this.handleMouseLeave);
+
+
+    if (this.sendIntervalId) {
+      clearInterval(this.sendIntervalId);
+      this.sendIntervalId = null;
+    }
+
+    if (this.data.length > 0) {
+      this.sendData();
+    }
+
+    this.isMouseOver = false;
+    this.currentMousePosition = null;
+    this.positionStartTime = null;
   }
 }
 
-export { MouseTracker };
+
+const MouseTrackerPlugin = {
+  install(Vue, options = {}) {
+    Vue.directive('track-coords', {
+      inserted(el, binding) {
+        const trackerOptions = binding.value || {};
+        const options = { ...options, ...trackerOptions };
+        const tracker = new MouseTracker(el, options);
+        tracker.start();
+        el._mouseTracker = tracker;
+      },
+      unbind(el) {
+        if (el._mouseTracker) {
+          el._mouseTracker.destroy();
+          delete el._mouseTracker;
+        }
+      }
+    });
+
+    Vue.prototype.$trackCoords = function (element, options = {}) {
+      const el = typeof element === 'string'
+        ? document.querySelector(element)
+        : element;
+
+      if (!el) {
+        console.error('Элемент не найден');
+        return null;
+      }
+
+      const tracker = new MouseTracker(el, options);
+      tracker.start();
+      return tracker;
+    };
+  }
+};
+
+export { MouseTracker, MouseTrackerPlugin };
+export default MouseTrackerPlugin;
