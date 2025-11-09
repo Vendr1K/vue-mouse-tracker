@@ -5,7 +5,7 @@ const trackArea = document.getElementById('trackArea');
 
 
 const BASE_URL = 'http://localhost:3000/save.php'
-const BASE_CHECK_INTERVAL = 30
+const BASE_CHECK_INTERVAL = 3000
 const BASE_SEND_INTERVAL = 3000
 
 
