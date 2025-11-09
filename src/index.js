@@ -196,16 +196,16 @@ class MouseTracker {
 
 
 const MouseTrackerPlugin = {
-  install(Vue, options = {}) {
-    Vue.directive('track-coords', {
-      inserted(el, binding) {
+  install(app, options = {}) {
+    app.directive('track-coords', {
+      mounted(el, binding) {
         const trackerOptions = binding.value || {};
-        const options = { ...options, ...trackerOptions };
-        const tracker = new MouseTracker(el, options);
+        const mergedOptions = { ...options, ...trackerOptions };
+        const tracker = new MouseTracker(el, mergedOptions);
         tracker.start();
         el._mouseTracker = tracker;
       },
-      unbind(el) {
+      unmounted(el) {
         if (el._mouseTracker) {
           el._mouseTracker.destroy();
           delete el._mouseTracker;
@@ -213,7 +213,7 @@ const MouseTrackerPlugin = {
       }
     });
 
-    Vue.prototype.$trackCoords = function (element, options = {}) {
+    app.config.globalProperties.$trackCoords = function (element, localOptions = {}) {
       const el = typeof element === 'string'
         ? document.querySelector(element)
         : element;
@@ -223,7 +223,8 @@ const MouseTrackerPlugin = {
         return null;
       }
 
-      const tracker = new MouseTracker(el, options);
+      const mergedOptions = { ...options, ...localOptions };
+      const tracker = new MouseTracker(el, mergedOptions);
       tracker.start();
       return tracker;
     };

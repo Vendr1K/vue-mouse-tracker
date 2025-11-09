@@ -1,7 +1,7 @@
 {
   "name": "vue-mouse-tracker",
   "version": "1.0.0",
-  "description": "Vue.js плагин для отслеживания координат курсора мыши",
+  "description": "Vue 3 плагин для отслеживания координат курсора мыши",
   "main": "src/index.js",
   "module": "src/index.js",
   "type": "module",
